@@ -1,0 +1,13 @@
+{
+  "name": "live-qa",
+  "version": "1.0.0",
+  "description": "Lightweight live polls, quizzes and audience Q&A for conference sessions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

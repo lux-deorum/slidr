@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Q&amp;A</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--muted:#6b7280;--line:#e3e6eb;--accent:#3b5bdb;--accent-ink:#fff;--good:#2f9e44;--bad:#e03131;--live:#e8590c;--track:#eef0f4}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--card:#1b1e25;--ink:#eceef2;--muted:#9aa1ad;--line:#2b2f38;--accent:#6c8cff;--accent-ink:#0b0d12;--good:#51cf66;--bad:#ff6b6b;--live:#ff922b;--track:#262a33}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.view{display:none;max-width:860px;margin:0 auto;padding:20px 16px 60px}
+.view.on{display:block}
+h1{font-size:26px;margin:4px 0}
+h2{font-size:19px;margin:0}
+h3{font-size:18px;margin:10px 0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.good{color:var(--good);font-weight:600}
+.bad{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.link{border:0;background:none;color:var(--accent);padding:4px 2px}
+button:disabled{opacity:.4;cursor:default}
+input[type=text],textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+label{font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.stack>*+*{margin-top:10px}
+.big-choice{display:grid;gap:14px;margin-top:28px}
+.big-choice button{padding:22px;font-size:20px;text-align:left;font-weight:600}
+.big-choice small{display:block;font-size:14px;font-weight:400;opacity:.8}
+.badge{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--track);color:var(--muted)}
+.badge.live{background:var(--live);color:#fff}
+.badge.quiz{color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--good);vertical-align:middle}
+.dot.off{background:var(--bad)}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;font-weight:800}
+.code-input{font-size:28px;text-transform:uppercase;text-align:center}
+.joinbox{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.join-url{font-size:18px;font-weight:600;word-break:break-all}
+.join-code{font-size:36px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:14px 0 4px}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 12px;color:var(--muted)}
+.tabs button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+.opts{margin:6px 0 12px;padding-left:22px}
+.opts li.correct{color:var(--good);font-weight:600}
+.opt-row{display:flex;gap:8px;align-items:center}
+.opt-row+.opt-row{margin-top:8px}
+.correct-pick{display:none;width:20px;height:20px;flex:none;accent-color:var(--good)}
+.is-quiz .correct-pick{display:block}
+.quiz-hint{display:none}
+.is-quiz .quiz-hint{display:block}
+.seg{display:flex;gap:16px}
+.seg label{font-weight:400}
+.bar{margin:10px 0}
+.bar-label{display:flex;justify-content:space-between;gap:12px;margin-bottom:4px}
+.bar-track{height:14px;background:var(--track);border-radius:7px;overflow:hidden}
+.bar-fill{height:100%;background:var(--accent);border-radius:inherit;transition:width .5s}
+.bars.reveal .bar:not(.correct) .bar-fill{opacity:.4}
+.bar.correct .bar-fill{background:var(--good)}
+.bar.correct .bar-label{color:var(--good);font-weight:700}
+.vote{display:block;width:100%;text-align:left;margin:8px 0;padding:14px;font-size:17px}
+.vote.picked{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent);font-weight:600}
+.qa-text{font-size:17px;margin:0 0 10px;white-space:pre-wrap}
+.qa-item.answered{opacity:.5}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;display:none;z-index:9;max-width:90vw}
+/* projector view */
+#screen.on{display:flex;flex-direction:column;max-width:none;min-height:100vh;padding:24px 48px}
+.screen-top{display:flex;justify-content:space-between;gap:20px;font-size:clamp(14px,1.6vw,22px);color:var(--muted)}
+.screen-main{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:1200px;margin:0 auto;padding:24px 0}
+.screen-main h1{font-size:clamp(28px,4.4vw,64px);line-height:1.15;margin:0 0 28px}
+.kicker{font-size:clamp(14px,1.6vw,22px);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+.screen-main .bar{margin:18px 0}
+.screen-main .bar-label{font-size:clamp(18px,2.2vw,32px)}
+.screen-main .bar-track{height:clamp(18px,2.4vw,38px);border-radius:10px}
+.screen-opt{font-size:clamp(20px,2.6vw,36px);padding:12px 20px;border:2px solid var(--line);border-radius:14px;margin:10px 0;background:var(--card)}
+.screen-opt b{color:var(--accent);margin-right:12px}
+.screen-count{font-size:clamp(16px,1.8vw,26px);color:var(--muted);margin-top:18px}
+.screen-join{text-align:center}
+.screen-join .label{font-size:clamp(18px,2.4vw,34px);color:var(--muted);margin:8px 0}
+.screen-join .url{font-size:clamp(28px,4vw,60px);font-weight:700;word-break:break-all}
+.screen-join .code{font-size:clamp(64px,12vw,190px);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- Home -->
+<section id="home" class="view">
+  <h1>Live Q&amp;A</h1>
+  <p class="muted">Polls, quizzes and audience questions for your session.</p>
+  <div class="big-choice">
+    <button class="primary" onclick="location.hash='present'">I’m the presenter<small>Set up questions and run the session</small></button>
+    <button onclick="location.hash='join'">I’m in the audience<small>Join with the code on screen</small></button>
+  </div>
+</section>
+
+<!-- Participant: enter code -->
+<section id="join" class="view">
+  <button class="link" onclick="location.hash=''">← Back</button>
+  <h1>Join a session</h1>
+  <form id="join-form" class="card stack">
+    <label for="join-code">Session code</label>
+    <input type="text" id="join-code" class="code code-input" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE">
+    <div id="join-err" class="bad small"></div>
+    <button class="primary" type="submit">Join</button>
+  </form>
+</section>
+
+<!-- Presenter: create session -->
+<section id="p-start" class="view">
+  <button class="link" onclick="location.hash=''">← Back</button>
+  <h1>New session</h1>
+  <form id="start-form" class="card stack">
+    <label for="p-title">Session title</label>
+    <input type="text" id="p-title" maxlength="100" placeholder="e.g. Designing for Trust — Room B" required>
+    <button class="primary" type="submit">Create session</button>
+  </form>
+  <p class="muted small">You’ll get a code to share with your audience. Your setup is saved in this browser, so run the session from the same browser you set it up in.</p>
+</section>
+
+<!-- Presenter: controls -->
+<section id="control" class="view">
+  <div class="row spread">
+    <div>
+      <h1 id="c-title"></h1>
+      <span class="muted small"><span class="dot"></span> Presenter controls</span>
+    </div>
+    <button id="open-screen" class="primary">Open screen view ↗</button>
+  </div>
+  <div class="card joinbox">
+    <div><div class="muted small">Audience joins at</div><div class="join-url" id="c-url"></div></div>
+    <div class="code join-code" id="c-code"></div>
+  </div>
+  <div class="row spread small">
+    <span id="c-screen" class="muted"></span>
+    <button class="link" id="new-session">Start a new session</button>
+  </div>
+  <div class="tabs">
+    <button data-tab="questions" class="on">Polls &amp; quizzes</button>
+    <button data-tab="qa" id="tab-qa">Audience Q&amp;A</button>
+  </div>
+  <div id="pane-questions">
+    <div id="qlist"></div>
+    <form id="qform" class="card stack">
+      <h2 id="qform-title">Add a question</h2>
+      <input type="text" id="q-text" maxlength="300" placeholder="Question">
+      <div class="seg">
+        <label><input type="radio" name="qtype" value="poll" checked> Poll</label>
+        <label><input type="radio" name="qtype" value="quiz"> Quiz</label>
+      </div>
+      <p class="quiz-hint muted small">Tick the circle next to the correct answer.</p>
+      <div id="opts"></div>
+      <button type="button" class="link" id="addopt">+ Add option</button>
+      <div class="row">
+        <button type="submit" class="primary">Save question</button>
+        <button type="button" id="cancel-edit" hidden>Cancel</button>
+      </div>
+    </form>
+  </div>
+  <div id="pane-qa" hidden><div id="qalist"></div></div>
+</section>
+
+<!-- Presenter: projector view -->
+<section id="screen" class="view">
+  <div class="screen-top" id="screen-top"></div>
+  <div class="screen-main" id="screen-main"></div>
+  <div class="small muted"><span class="dot"></span></div>
+</section>
+
+<!-- Participant -->
+<section id="participant" class="view">
+  <div class="row spread">
+    <div>
+      <h1 id="pt-title"></h1>
+      <span class="muted small"><span class="dot"></span> Code <span id="pt-code" class="code"></span></span>
+    </div>
+    <button class="link" onclick="location.hash=''">Leave</button>
+  </div>
+  <div id="plist"></div>
+  <form id="ask-form" class="card stack">
+    <h2>Ask the presenter</h2>
+    <textarea id="ask-text" maxlength="500" placeholder="Type your question…" required></textarea>
+    <input type="text" id="ask-name" maxlength="60" placeholder="Your name (optional — leave blank to stay anonymous)">
+    <button class="primary" type="submit">Send question</button>
+  </form>
+</section>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} }
+};
+const LETTERS = 'ABCDE';
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+let voter = store.get('qp_voter');
+if (!voter) { voter = crypto.getRandomValues(new Uint32Array(3)).join('-'); store.set('qp_voter', voter); }
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(d.error || 'Something went wrong'); e.status = r.status; throw e; }
+  return d;
+}
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3200);
+}
+
+function show(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === id));
+  window.scrollTo(0, 0);
+}
+
+// Live connection with automatic reconnect.
+let stopStream = null;
+function stream(getUrl, onData, onLost) {
+  if (stopStream) stopStream();
+  let es, stopped = false, timer;
+  const dot = ok => document.querySelectorAll('.dot').forEach(d => d.classList.toggle('off', !ok));
+  const open = () => {
+    es = new EventSource(getUrl());
+    es.onopen = () => dot(true);
+    es.onmessage = e => { dot(true); onData(JSON.parse(e.data)); };
+    es.onerror = () => {
+      es.close(); dot(false);
+      if (stopped) return;
+      timer = setTimeout(async () => { try { if (onLost) await onLost(); } catch {} if (!stopped) open(); }, 2500);
+    };
+  };
+  open();
+  stopStream = () => { stopped = true; clearTimeout(timer); if (es) es.close(); };
+}
+
+function bars(q, reveal) {
+  const total = q.counts.reduce((a, b) => a + b, 0);
+  const showCorrect = reveal && q.type === 'quiz' && q.correct !== null;
+  return `<div class="bars ${showCorrect ? 'reveal' : ''}">` + q.options.map((o, i) => {
+    const n = q.counts[i], pct = total ? Math.round(n * 100 / total) : 0;
+    const ok = showCorrect && i === q.correct;
+    return `<div class="bar ${ok ? 'correct' : ''}">
+      <div class="bar-label"><span>${ok ? '✓ ' : ''}${esc(o)}</span><span>${n} · ${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></div>`;
+  }).join('') + '</div>';
+}
+
+// ================= Router =================
+function route() {
+  if (stopStream) { stopStream(); stopStream = null; }
+  const h = location.hash.replace(/^#\/?/, '');
+  if (h === 'present') return startPresenter();
+  if (h === 'screen') return startScreen();
+  if (h === 'join') { show('join'); $('#join-err').textContent = ''; $('#join-code').focus(); return; }
+  if (/^[A-Za-z0-9]{5}$/.test(h)) return startParticipant(h.toUpperCase());
+  show('home');
+}
+window.addEventListener('hashchange', route);
+
+// ================= Presenter =================
+let P = null;   // saved in this browser: {code, key, title, questions}
+let PS = null;  // latest live state from the server
+let editingId = null;
+
+const pApi = (action, body) => api(`/api/${P.code}/${action}`, { ...body, key: P.key });
+
+// Reconnects to the session, or recreates it from this browser's copy if the server restarted.
+async function ensureSession() {
+  P = store.get('qp_presenter') || P;
+  try {
+    const r = await api('/api/session', P);
+    P.code = r.code; P.key = r.key;
+  } catch (e) {
+    if (e.status !== 403) throw e;
+    const r = await api('/api/session', { title: P.title, questions: P.questions });
+    P.code = r.code; P.key = r.key;
+    toast('Your join code changed to ' + r.code);
+  }
+  store.set('qp_presenter', P);
+  renderJoin();
+}
+
+async function startPresenter() {
+  P = store.get('qp_presenter') || P;
+  if (!P) { show('p-start'); $('#p-title').focus(); return; }
+  show('control'); renderJoin();
+  try { await ensureSession(); } catch (e) { toast(e.message); }
+  stream(() => `/api/${P.code}/events?role=presenter&key=${encodeURIComponent(P.key)}`, onPresenterData, ensureSession);
+}
+
+function onPresenterData(d) {
+  PS = d;
+  P.title = d.title;
+  P.questions = d.questions.map(({ id, text, type, options, correct }) => ({ id, text, type, options, correct }));
+  store.set('qp_presenter', P);
+  renderControl();
+}
+
+function renderJoin() {
+  $('#c-title').textContent = P.title;
+  $('#c-code').textContent = P.code;
+  $('#c-url').textContent = `${location.host}/#${P.code}`;
+}
+
+function screenLabel(d) {
+  const c = d.current;
+  let what = 'the join code';
+  if (c && c.kind === 'q') what = 'question ' + (d.questions.findIndex(q => q.id === c.id) + 1);
+  if (c && c.kind === 'qa') what = 'an audience question';
+  return `Screen view is showing <b>${what}</b>` + (c ? ` · <button class="link" data-act="screen-clear">Show join code</button>` : '');
+}
+
+function qCard(q, i, d) {
+  const onScreen = d.current && d.current.kind === 'q' && d.current.id === q.id;
+  const status = q.status === 'draft' ? '<span class="badge">Draft</span>'
+    : q.status === 'live' ? `<span class="badge live">Live · ${plural(q.total, 'response')}</span>`
+    : `<span class="badge">Results shown · ${plural(q.total, 'response')}</span>`;
+  const body = q.status === 'draft'
+    ? `<ol class="opts" type="A">${q.options.map((o, j) => {
+        const ok = q.type === 'quiz' && j === q.correct;
+        return `<li class="${ok ? 'correct' : ''}">${esc(o)}${ok ? ' ✓' : ''}</li>`;
+      }).join('')}</ol>`
+    : bars(q, true);
+  const screenBtn = onScreen ? '<span class="muted small">● On screen</span>' : `<button data-act="screen-q" data-id="${q.id}">Put on screen</button>`;
+  const btns = q.status === 'draft'
+    ? `<button class="primary" data-act="live" data-id="${q.id}">Go live</button>
+       <button data-act="edit" data-id="${q.id}">Edit</button>
+       <button data-act="delete" data-id="${q.id}">Delete</button>`
+    : q.status === 'live'
+    ? `<button class="primary" data-act="close" data-id="${q.id}">Show results</button>${screenBtn}
+       <button data-act="reset" data-id="${q.id}">Reset</button>`
+    : `${screenBtn}<button data-act="reset" data-id="${q.id}">Reset</button>`;
+  return `<div class="card">
+    <div class="row spread"><span class="badge ${q.type}">${q.type === 'quiz' ? 'Quiz' : 'Poll'}</span>${status}</div>
+    <h3>${i + 1}. ${esc(q.text)}</h3>${body}<div class="row">${btns}</div></div>`;
+}
+
+function renderControl() {
+  const d = PS; if (!d) return;
+  const waiting = d.qa.filter(x => !x.answered).length;
+  $('#tab-qa').textContent = `Audience Q&A (${waiting})`;
+  $('#c-screen').innerHTML = screenLabel(d);
+  $('#qlist').innerHTML = d.questions.length
+    ? d.questions.map((q, i) => qCard(q, i, d)).join('')
+    : '<p class="muted">No questions yet. Add your first poll or quiz below.</p>';
+
+  const items = [...d.qa].sort((a, b) => (a.answered - b.answered) || (a.ts - b.ts));
+  $('#qalist').innerHTML = items.length ? items.map(x => {
+    const on = d.current && d.current.kind === 'qa' && d.current.id === x.id;
+    const time = new Date(x.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `<div class="card qa-item ${x.answered ? 'answered' : ''}">
+      <p class="qa-text">${esc(x.text)}</p>
+      <div class="row spread">
+        <span class="muted small">${x.name ? esc(x.name) : 'Anonymous'} · ${time}</span>
+        <div class="row">
+          ${on ? '<span class="muted small">● On screen</span>' : `<button data-act="screen-qa" data-id="${x.id}">Show on screen</button>`}
+          <button data-act="answered" data-id="${x.id}">${x.answered ? 'Unmark' : 'Mark answered'}</button>
+        </div>
+      </div></div>`;
+  }).join('') : '<p class="muted">No audience questions yet. They’ll collect here during your session.</p>';
+}
+
+$('#start-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const title = $('#p-title').value.trim();
+  try {
+    const r = await api('/api/session', { title });
+    P = { code: r.code, key: r.key, title, questions: [] };
+    store.set('qp_presenter', P);
+    startPresenter();
+  } catch (err) { toast(err.message); }
+});
+
+$('#new-session').addEventListener('click', () => {
+  if (!confirm('Start a new session? This clears your current session and its questions from this browser.')) return;
+  store.del('qp_presenter'); P = null; PS = null;
+  if (stopStream) { stopStream(); stopStream = null; }
+  $('#p-title').value = '';
+  startPresenter();
+});
+
+$('#open-screen').addEventListener('click', () => window.open(location.pathname + '#screen', 'liveqa-screen'));
+
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x === b));
+  $('#pane-questions').hidden = b.dataset.tab !== 'questions';
+  $('#pane-qa').hidden = b.dataset.tab !== 'qa';
+}));
+
+$('#control').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const { act, id } = b.dataset;
+  try {
+    if (act === 'edit') return editQuestion(id);
+    if (act === 'delete') { if (confirm('Delete this question?')) await pApi('delete', { id }); }
+    else if (act === 'reset') { if (confirm('Reset this question? Its votes are cleared and it goes back to draft.')) await pApi('reset', { id }); }
+    else if (act === 'live' || act === 'close' || act === 'answered') await pApi(act, { id });
+    else if (act === 'screen-q') await pApi('screen', { current: { kind: 'q', id } });
+    else if (act === 'screen-qa') await pApi('screen', { current: { kind: 'qa', id } });
+    else if (act === 'screen-clear') await pApi('screen', { current: null });
+  } catch (err) { toast(err.message); }
+});
+
+// ----- question editor -----
+function optRow(val = '', checked = false) {
+  return `<div class="opt-row">
+    <input type="radio" name="correct" class="correct-pick" title="Correct answer" ${checked ? 'checked' : ''}>
+    <input type="text" class="opt" maxlength="120" placeholder="Option" value="${esc(val)}">
+    <button type="button" class="link rm" title="Remove option">✕</button></div>`;
+}
+function qtype() { return document.querySelector('input[name=qtype]:checked').value; }
+function syncEditor() {
+  $('#qform').classList.toggle('is-quiz', qtype() === 'quiz');
+  const rows = $('#opts').children;
+  $('#addopt').disabled = rows.length >= 5;
+  [...rows].forEach(r => r.querySelector('.rm').disabled = rows.length <= 2);
+}
+function setEditor(q) {
+  editingId = q ? q.id : null;
+  $('#q-text').value = q ? q.text : '';
+  document.querySelector(`input[name=qtype][value=${q ? q.type : 'poll'}]`).checked = true;
+  $('#opts').innerHTML = (q ? q.options : ['', '']).map((o, i) => optRow(o, q && q.type === 'quiz' && i === q.correct)).join('');
+  $('#qform-title').textContent = q ? 'Edit question' : 'Add a question';
+  $('#cancel-edit').hidden = !q;
+  syncEditor();
+}
+function editQuestion(id) {
+  const q = PS && PS.questions.find(x => x.id === id);
+  if (!q) return;
+  setEditor(q);
+  $('#qform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#q-text').focus();
+}
+$('#qform').addEventListener('change', e => { if (e.target.name === 'qtype') syncEditor(); });
+$('#addopt').addEventListener('click', () => {
+  if ($('#opts').children.length >= 5) return;
+  $('#opts').insertAdjacentHTML('beforeend', optRow());
+  syncEditor();
+  [...$('#opts').querySelectorAll('.opt')].pop().focus();
+});
+$('#opts').addEventListener('click', e => {
+  if (!e.target.classList.contains('rm') || $('#opts').children.length <= 2) return;
+  e.target.closest('.opt-row').remove(); syncEditor();
+});
+$('#cancel-edit').addEventListener('click', () => setEditor(null));
+$('#qform').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = $('#q-text').value.trim();
+  if (!text) return toast('Write the question first.');
+  const rows = [...$('#opts').children];
+  const options = rows.map(r => r.querySelector('.opt').value.trim());
+  if (options.some(o => !o)) return toast('Fill in or remove the empty options.');
+  const type = qtype();
+  let correct = null;
+  if (type === 'quiz') {
+    correct = rows.findIndex(r => r.querySelector('.correct-pick').checked);
+    if (correct < 0) return toast('Tick the correct answer for this quiz.');
+  }
+  try {
+    await pApi('save', { question: { id: editingId, text, type, options, correct } });
+    setEditor(null);
+    toast('Saved');
+  } catch (err) { toast(err.message); }
+});
+
+// ================= Screen view (projector) =================
+function startScreen() {
+  show('screen');
+  P = store.get('qp_presenter');
+  if (!P) { $('#screen-top').innerHTML = ''; $('#screen-main').innerHTML = '<h1>Open the presenter page in this browser first.</h1>'; return; }
+  stream(() => `/api/${P.code}/events?role=presenter&key=${encodeURIComponent(P.key)}`, renderScreen,
+         () => { P = store.get('qp_presenter') || P; });
+}
+
+function renderScreen(d) {
+  const host = esc(location.host);
+  const c = d.current;
+  const q = c && c.kind === 'q' && d.questions.find(x => x.id === c.id);
+  const a = c && c.kind === 'qa' && d.qa.find(x => x.id === c.id);
+  const showTop = (q && q.status !== 'draft') || a;
+  $('#screen-top').innerHTML = showTop
+    ? `<span>${esc(d.title)}</span><span>Join at <b>${host}</b> · code <b class="code">${d.code}</b></span>` : '';
+  let html;
+  if (q && q.status === 'live') {
+    html = `<div class="kicker">${q.type === 'quiz' ? 'Quiz' : 'Poll'} · answer on your phone</div>
+      <h1>${esc(q.text)}</h1>
+      ${q.options.map((o, i) => `<div class="screen-opt"><b>${LETTERS[i]}</b>${esc(o)}</div>`).join('')}
+      <div class="screen-count">${plural(q.total, 'response')}</div>`;
+  } else if (q && q.status === 'closed') {
+    html = `<div class="kicker">Results</div><h1>${esc(q.text)}</h1>${bars(q, true)}
+      <div class="screen-count">${plural(q.total, 'response')}</div>`;
+  } else if (a) {
+    html = `<div class="kicker">Audience question</div><h1>“${esc(a.text)}”</h1>
+      <div class="screen-count">— ${a.name ? esc(a.name) : 'Anonymous'}</div>`;
+  } else {
+    html = `<div class="screen-join">
+      <div class="label">${esc(d.title)}</div>
+      <div class="label">Go to</div><div class="url">${host}</div>
+      <div class="label">and enter code</div><div class="code">${d.code}</div></div>`;
+  }
+  $('#screen-main').innerHTML = html;
+}
+
+// ================= Participant =================
+let PC = null;
+
+$('#join-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const code = $('#join-code').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)) { $('#join-err').textContent = 'Codes are 5 letters/numbers.'; return; }
+  if (location.hash === '#' + code) route(); else location.hash = code;
+});
+
+async function startParticipant(code) {
+  show('participant');
+  $('#pt-title').textContent = 'Joining…';
+  $('#pt-code').textContent = code;
+  $('#plist').innerHTML = '';
+  try {
+    const r = await api(`/api/${code}/check`);
+    $('#pt-title').textContent = r.title;
+  } catch (e) {
+    show('join');
+    $('#join-code').value = code;
+    $('#join-err').textContent = e.status === 404 ? 'No session with that code. Check it and try again.' : e.message;
+    return;
+  }
+  PC = code;
+  $('#ask-name').value = store.get('qp_name') || '';
+  stream(() => `/api/${code}/events?role=participant&voter=${encodeURIComponent(voter)}`, renderParticipant);
+}
+
+function renderParticipant(d) {
+  $('#pt-title').textContent = d.title;
+  const live = d.questions.filter(q => q.status === 'live');
+  const closed = d.questions.filter(q => q.status === 'closed').reverse();
+  if (!live.length && !closed.length) {
+    $('#plist').innerHTML = '<div class="card muted">Nothing live right now. When the presenter opens a poll or quiz, it’ll appear here.</div>';
+    return;
+  }
+  const badge = q => `<span class="badge ${q.type}">${q.type === 'quiz' ? 'Quiz' : 'Poll'}</span>`;
+  $('#plist').innerHTML =
+    live.map(q => `<div class="card">
+      <div class="row spread">${badge(q)}<span class="badge live">Live</span></div>
+      <h3>${esc(q.text)}</h3>
+      ${q.options.map((o, i) => `<button class="vote ${q.myVote === i ? 'picked' : ''}" data-q="${q.id}" data-o="${i}">${esc(o)}</button>`).join('')}
+      <p class="muted small">${q.myVote === null ? 'Tap your answer.' : 'Got it! You can change your answer until the results are shown.'}</p>
+    </div>`).join('') +
+    closed.map(q => {
+      let note = '';
+      if (q.myVote !== null) {
+        const mine = esc(q.options[q.myVote]);
+        note = q.type === 'quiz'
+          ? (q.myVote === q.correct ? '<p class="good">✓ You got it right!</p>' : `<p class="bad">✗ You answered “${mine}”</p>`)
+          : `<p class="muted small">You answered “${mine}”</p>`;
+      }
+      return `<div class="card"><div class="row spread">${badge(q)}<span class="badge">Results</span></div>
+        <h3>${esc(q.text)}</h3>${bars(q, true)}${note}</div>`;
+    }).join('');
+}
+
+$('#plist').addEventListener('click', async e => {
+  const b = e.target.closest('.vote'); if (!b) return;
+  b.closest('.card').querySelectorAll('.vote').forEach(x => x.classList.toggle('picked', x === b));
+  try { await api(`/api/${PC}/vote`, { id: b.dataset.q, option: Number(b.dataset.o), voter }); }
+  catch (err) { toast(err.message); }
+});
+
+$('#ask-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = $('#ask-text').value.trim();
+  if (!text) return;
+  const name = $('#ask-name').value.trim();
+  store.set('qp_name', name);
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true;
+  try {
+    await api(`/api/${PC}/ask`, { text, name });
+    $('#ask-text').value = '';
+    toast('Sent! The presenter will see your question.');
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+});
+
+setEditor(null);
+route();
+</script>
+</body>
+</html>
